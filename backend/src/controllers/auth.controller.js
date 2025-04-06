@@ -47,6 +47,7 @@ export const signup = async (req, res) => {
             secure: process.env.NODE_ENV === "production",
             sameSite: "strict"
         });
+        console.log(token);
 
         // Send response
         res.status(201).json({
@@ -54,7 +55,7 @@ export const signup = async (req, res) => {
             fullName: newUser.fullName,
             email: newUser.email,
             profilePic: newUser.profilePic || null,
-           
+            token:token
         });
 
     } catch (error) {
@@ -79,12 +80,20 @@ export const login = async(req, res) => {
             return res.status(400).json({message:"Invalid credentails"})
 
         }
-        generateToken(user._id, res)
+        const token=generateToken(user._id, res)
+                // Set token in cookie
+                res.cookie("token", token, {
+                    httpOnly: true,
+                    secure: process.env.NODE_ENV === "production",
+                    sameSite: "strict"
+                });
+                console.log(token);
         return res.status(200).json({
             _id:user.id,
             fullName:user.fullName,
             email:user.email,
             profilePic:user.profilePic,
+            token:token,
         })
 
     } catch (error) {
@@ -92,6 +101,7 @@ export const login = async(req, res) => {
         return res.status(500).json({message:"Internal server error"});
 
     }
+    res.send()
 };
 
 export const logout = (req, res) => {
