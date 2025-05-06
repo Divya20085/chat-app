@@ -5,30 +5,36 @@ import { useAuthStore } from "./useAuthStore";
 
 export const useChatStore = create((set, get) => ({
   messages: [],
-  users: [],
+  users: [], // ✅ Always starts as an array
   selectedUser: null,
   isUsersLoading: false,
   isMessagesLoading: false,
 
-  // Fetch users for the sidebar or contacts list
+  // ✅ Fetch users
   getUsers: async () => {
     set({ isUsersLoading: true });
     try {
-      const res = await axiosInstance.get("/messages/users"); // Update the correct endpoint
-      set({ users: res.data });
+      const res = await axiosInstance.get("/auth/check"); // Make sure this endpoint returns an array!
+      
+      // ✅ Defensive: ensure response is an array
+      const usersArray = Array.isArray(res.data) ? res.data : [];
+      set({ users: usersArray });
+
     } catch (error) {
       toast.error(error.response?.data?.message || "Error fetching users");
+      set({ users: [] }); // ✅ Prevent future crashes
     } finally {
       set({ isUsersLoading: false });
     }
   },
 
-  // Fetch messages for a selected user
+  // Fetch messages
   getMessages: async (userId) => {
     set({ isMessagesLoading: true });
     try {
       const res = await axiosInstance.get(`/messages/${userId}`);
-      set({ messages: res.data });
+      const messagesArray = Array.isArray(res.data) ? res.data : [];
+      set({ messages: messagesArray });
     } catch (error) {
       toast.error(error.response?.data?.message || "Error fetching messages");
     } finally {
@@ -36,7 +42,7 @@ export const useChatStore = create((set, get) => ({
     }
   },
 
-  // Send a message to the selected user
+  // Send a message
   sendMessage: async (messageData) => {
     const { selectedUser, messages } = get();
     try {
@@ -47,42 +53,38 @@ export const useChatStore = create((set, get) => ({
     }
   },
 
-  // Subscribe to incoming messages from the selected user
+  // Subscribe to real-time messages
   subscribeToMessages: () => {
     const { selectedUser } = get();
     if (!selectedUser) return;
 
-    const socket = useAuthStore.getState().socket; // Get socket from auth store
+    const socket = useAuthStore.getState().socket;
 
-    // Check if socket connection is available before subscribing
     if (!socket) {
       console.error("Socket connection is not available");
       return;
     }
 
-    // Listen for new messages
     socket.on("newMessage", (newMessage) => {
-      const isMessageSentFromSelectedUser = newMessage.senderId === selectedUser._id;
-      if (!isMessageSentFromSelectedUser) return;
+      const isMessageFromSelectedUser = newMessage.senderId === selectedUser._id;
+      if (!isMessageFromSelectedUser) return;
 
-      // Append new message to the existing messages
       set({
         messages: [...get().messages, newMessage],
       });
     });
   },
 
-  // Unsubscribe from the incoming messages when no longer needed
+  // Unsubscribe
   unsubscribeFromMessages: () => {
-    const socket = useAuthStore.getState().socket; // Get socket from auth store
-
+    const socket = useAuthStore.getState().socket;
     if (socket) {
-      socket.off("newMessage"); // Remove event listener for 'newMessage'
+      socket.off("newMessage");
     } else {
-      console.warn("Socket connection is not available to unsubscribe");
+      console.warn("Socket not available for unsubscribe");
     }
   },
 
-  // Set the currently selected user
+  // Set selected user
   setSelectedUser: (selectedUser) => set({ selectedUser }),
 }));
